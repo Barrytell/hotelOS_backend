@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Sellable white-label license tier. This table is the single source of
+/// truth for prices and features on both the marketing site and checkout.
+model LicenseProduct {
+  id            String         @id @default(cuid())
+  slug          String         @unique // "starter", "professional", "agency"
+  name          String // "Starter License"
+  description   String?
+  priceUSD      Decimal        @db.Decimal(10, 2)
+  currency      String         @default("USD")
+  features      String[]
+  isFeatured    Boolean        @default(false) // "Most popular" badge
+  isActive      Boolean        @default(true)
+  displayOrder  Int            @default(0)
+  stripePriceId String? // Stripe Price object ID, synced when priceUSD changes
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  orders        LicenseOrder[]
+}
+
+model LicenseOrder {
+  id                   String          @id @default(cuid())
+  orderNumber          String          @unique // e.g. "HOS-2026-00042"
+  productId            String
+  product              LicenseProduct  @relation(fields: [productId], references: [id])
+  buyerName            String
+  buyerEmail           String
+  buyerPhone           String?
+  buyerCountry         String?
+  amount               Decimal         @db.Decimal(10, 2)
+  currency             String
+  gateway              PaymentGateway
+  gatewayReference     String? // Stripe session ID or FLW tx_ref
+  gatewayTransactionId String? // Stripe payment_intent or FLW transaction id
+  status               OrderStatus     @default(PENDING)
+  paidAt               DateTime?
+  accessGrantedAt      DateTime?
+  accessGrantedById    String?
+  githubUsername       String?
+  notes                String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([buyerEmail])
+  @@index([status])
+  @@index([gateway, gatewayReference])
+}
+
+enum PaymentGateway {
+  STRIPE
+  FLUTTERWAVE
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
